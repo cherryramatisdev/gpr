@@ -4,22 +4,26 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/term"
+
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/cherryramatisdev/gpr/pkg/gh"
 )
 
 const listHeight = 14
 
 type pr struct {
-	title  string
-	desc   string
-	org    string
-	repo   string
-	number int
+	title       string
+	state       string
+	description string
+	org         string
+	repo        string
+	number      int
 }
 
 func (p pr) Title() string       { return p.title }
-func (p pr) Description() string { return p.desc }
+func (p pr) Description() string { return p.description }
 func (p pr) FilterValue() string { return p.title }
 
 type model struct {
@@ -27,31 +31,27 @@ type model struct {
 }
 
 func initialModel() model {
-	items := []list.Item{
-		pr{
-			title:  "PR TITLE 1",
-			org:    "cherryramatisdev",
-			repo:   "gpr",
-			number: 700,
-		},
-		pr{
-			title:  "PR TITLE 2",
-			org:    "cherryramatisdev",
-			repo:   "gpr",
-			number: 700,
-		},
-		pr{
-			title:  "PR TITLE 3",
-			org:    "cherryramatisdev",
-			repo:   "gpr",
-			number: 700,
-		},
+	ghPrs, _ := gh.ListAllPrs()
+
+	items := make([]list.Item, len(ghPrs))
+
+	for i, ghPr := range ghPrs {
+		items[i] = pr{
+			title:       ghPr.Name,
+			state:       ghPr.State,
+			description: ghPr.Desc,
+			org:         "org",
+			repo:        "repo",
+			number:      ghPr.Number,
+		}
 	}
 
 	const defaultWidth = 20
 
-	prs := list.New(items, list.NewDefaultDelegate(), defaultWidth, listHeight)
-	prs.Title = "Title"
+	width, height, _ := term.GetSize(0)
+
+	prs := list.New(items, list.NewDefaultDelegate(), width, height)
+	prs.Title = "Pull requests"
 
 	return model{prs: prs}
 }
@@ -63,8 +63,16 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Don't match any of the keys below if we're actively filtering.
+		if m.prs.FilterState() == list.Filtering {
+			break
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "enter":
+			fmt.Println(m.prs.SelectedItem())
 			return m, tea.Quit
 		}
 	}
