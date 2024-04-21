@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
+	"strings"
 )
 
 // PullRequest act as the main entry to represent github PRs, for listing,
@@ -15,6 +17,7 @@ type PullRequest struct {
 	Desc   string `json:"body"`
 	URL    string `json:"url"`
 	Number int    `json:"number"`
+	Status string
 }
 
 func ListAllPrs() ([]PullRequest, error) {
@@ -52,5 +55,38 @@ func ListAllPrs() ([]PullRequest, error) {
 		return nil, err
 	}
 
-	return prs, nil
+	items := make([]PullRequest, len(prs))
+
+	for i, pr := range prs {
+		prrStatusCmd := exec.Command("prr", "status", "-n")
+		prrStatus, _ := prrStatusCmd.Output()
+
+		prrStatuses := strings.Split(string(prrStatus), "\n")
+		prrStatusContent := "UNKNOWN"
+
+		for _, item := range prrStatuses {
+			columns := strings.Fields(item)
+
+			if len(columns) == 0 {
+				continue
+			}
+
+			name, status := columns[0], columns[1]
+
+			if strings.Contains(name, fmt.Sprint(pr.Number)) {
+				prrStatusContent = status
+			}
+		}
+
+		items[i] = PullRequest{
+			Name:   pr.Name,
+			State:  pr.State,
+			Desc:   pr.Desc,
+			URL:    pr.URL,
+			Number: pr.Number,
+			Status: prrStatusContent,
+		}
+	}
+
+	return items, nil
 }

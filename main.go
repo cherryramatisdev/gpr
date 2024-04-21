@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/cherryramatisdev/gpr/pkg/gh"
 )
 
@@ -22,9 +23,23 @@ type pr struct {
 	repo        string
 	url         string
 	number      int
+	prrStatus   string
 }
 
-func (p pr) Title() string       { return p.title }
+func (p pr) Title() string {
+	pr_state_color := "#64FC00"
+
+	var prStateStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(pr_state_color))
+
+	var prrStatusStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FEA400"))
+
+	return fmt.Sprintf("%s %s %s", prStateStyle.Render("[", p.state, "]"), p.title, prrStatusStyle.Render("[", p.prrStatus, "]"))
+}
+
 func (p pr) Description() string { return p.description }
 func (p pr) FilterValue() string { return p.title }
 
@@ -50,6 +65,7 @@ func initialModel() model {
 			repo:        repo,
 			number:      ghPr.Number,
 			url:         ghPr.URL,
+			prrStatus:   ghPr.Status,
 		}
 	}
 
