@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -21,9 +22,13 @@ type PullRequest struct {
 }
 
 func ListAllPrs() ([]PullRequest, error) {
-	repo := "360-Hub/api-360-hub-new"
-	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls", repo)
+	repo, err := getGitRemote()
 
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls", repo)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
@@ -31,7 +36,7 @@ func ListAllPrs() ([]PullRequest, error) {
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("Authorization", "Bearer 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")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("GPR_GH_TOKEN")))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -43,7 +48,7 @@ func ListAllPrs() ([]PullRequest, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body:", err)
+		fmt.Println("Error reading response body:", string(body))
 		return nil, err
 	}
 
@@ -89,4 +94,17 @@ func ListAllPrs() ([]PullRequest, error) {
 	}
 
 	return items, nil
+}
+
+func getGitRemote() (string, error) {
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	output, err := cmd.Output()
+
+	if err != nil {
+		return "", err
+	}
+
+	repoNameWithSuffix := strings.Trim(strings.Split(string(output), ":")[1], "\n")
+
+	return strings.Replace(repoNameWithSuffix, ".git", "", -1), nil
 }

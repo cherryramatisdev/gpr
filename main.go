@@ -138,6 +138,15 @@ func (m model) View() string {
 }
 
 func main() {
+	dir := ".git"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		panic("Run inside a git directory")
+	}
+
+	if len(os.Getenv("GPR_GH_TOKEN")) == 0 {
+		panic("Please configure the GPR_GH_TOKEN env var")
+	}
+
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
