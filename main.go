@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -11,14 +14,13 @@ import (
 	"github.com/cherryramatisdev/gpr/pkg/gh"
 )
 
-const listHeight = 14
-
 type pr struct {
 	title       string
 	state       string
 	description string
 	org         string
 	repo        string
+	url         string
 	number      int
 }
 
@@ -36,17 +38,20 @@ func initialModel() model {
 	items := make([]list.Item, len(ghPrs))
 
 	for i, ghPr := range ghPrs {
+		u, _ := url.Parse(ghPr.URL)
+		parts := strings.Split(u.Path, "/")
+		org, repo := parts[2], parts[3]
+
 		items[i] = pr{
 			title:       ghPr.Name,
 			state:       ghPr.State,
 			description: ghPr.Desc,
-			org:         "org",
-			repo:        "repo",
+			org:         org,
+			repo:        repo,
 			number:      ghPr.Number,
+			url:         ghPr.URL,
 		}
 	}
-
-	const defaultWidth = 20
 
 	width, height, _ := term.GetSize(0)
 
@@ -71,9 +76,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "o":
+			currentItem := m.prs.SelectedItem().(pr)
+
+			openCmd := exec.Command("open", fmt.Sprintf("https://github.com/%s/%s/pull/%d", currentItem.org, currentItem.repo, currentItem.number))
+
+			cmd := tea.ExecProcess(openCmd, func(err error) tea.Msg {
+				return nil
+			})
+
+			return m, cmd
+		case "s":
+			currentItem := m.prs.SelectedItem().(pr)
+
+			submitCmd := exec.Command("prr", "submit", fmt.Sprintf("%s/%s/%d", currentItem.org, currentItem.repo, currentItem.number))
+
+			cmd := tea.ExecProcess(submitCmd, func(err error) tea.Msg {
+				return nil
+			})
+
+			return m, cmd
 		case "enter":
-			fmt.Println(m.prs.SelectedItem())
-			return m, tea.Quit
+			currentItem := m.prs.SelectedItem().(pr)
+
+			getCmd := exec.Command("prr", "get", fmt.Sprintf("%s/%s/%d", currentItem.org, currentItem.repo, currentItem.number))
+			getCmd.Run()
+
+			editCmd := exec.Command("prr", "edit", fmt.Sprintf("%s/%s/%d", currentItem.org, currentItem.repo, currentItem.number))
+
+			cmd := tea.ExecProcess(editCmd, func(err error) tea.Msg {
+				return nil
+			})
+
+			return m, cmd
 		}
 	}
 
@@ -90,7 +125,7 @@ func main() {
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
-		fmt.Println("Deu merda menor %v", err)
+		fmt.Printf("Deu merda menor %v\n", err)
 		os.Exit(1)
 	}
 }
